@@ -1,6 +1,6 @@
 'use strict';
 
-const dataBase = []; // Данные формы
+const dataBase = JSON.parse(localStorage.getItem('awito')) || []; // Все данные
 
 const modalAdd = document.querySelector('.modal__add'), // Окно добавления объявления
       addAd = document.querySelector('.add__ad'), // Кнопка добавления объявления
@@ -8,40 +8,126 @@ const modalAdd = document.querySelector('.modal__add'), // Окно добавл
       modalSubmit = document.querySelector('.modal__submit'), // Форма добавления объявления
       modalItem = document.querySelector(".modal__item"), // Модальное окно товара
       catalog = document.querySelector(".catalog"), // Блок с товарами
-      modalBtnWarning = document.querySelector(".modal__btn-warning"); // Предупреждение о заполненни полей
+      modalBtnWarning = document.querySelector(".modal__btn-warning"), // Предупреждение о заполненни полей
+      modalFileInput = document.querySelector('.modal__file-input'), // Кнопка прикрепления фотки
+      modalFileBtn = document.querySelector('.modal__file-btn'), // Кнопка добавления фотки
+      modalImageAdd = document.querySelector('.modal__image-add'); // Картинка в форме
+
+const textFileBtn = modalFileBtn.textContent; // Текст кнопки добавления фотки
+const srcModalImage = modalImageAdd.src; // Путь до изначальной картинки
 
 // Выбирает из формы только input'ы
 const elementsModalSubmit = [...modalSubmit.elements].filter(elem => elem.tagName !== 'BUTTON' && elem.type !== 'submit');
+
+// Инфа о прикрепляемой фотографии
+const infoPhoto = {};
+
+// Сохраненные данные
+const saveDB = () => localStorage.setItem('awito', JSON.stringify(dataBase));
 
 // Закртытие модального окна
 const closeModal = function(event) {
 
    const target = event.target; // НА что нажали
-   // Если был нажат крестик или вложка и нажатый блок не является телом документа
-   if (target.closest('.modal__close') || target === this && target !== document.body) {
-      this.classList.add('hide'); // Закрываем открытое окно
-      // Если открыто окно объявления
-      if (this === modalAdd){
-         modalSubmit.reset(); // Очищает форму
-      }
-   }
-
-   // Если была нажата клавиша ESC
-   if (event.code === 'Escape') {
+   // Если был нажат крестик или вложка или клавиша ESC и нажатый блок не является телом документа
+   if (target.closest('.modal__close') || target.classList.contains('modal') || event.code === 'Escape') {
       modalAdd.classList.add('hide'); // Скрывает окно объявления
       modalItem.classList.add('hide'); // Скрывает окно товара
-      modalSubmit.reset(); // Очищает форму
+      modalItem.innerHTML = '';
       document.body.removeEventListener('keydown', closeModal); // Удалает событие нажатия клавиши
+      modalSubmit.reset(); // Очищает форму
+      modalImageAdd.src = srcModalImage;
+      modalFileBtn.textContent = textFileBtn;
+      checkForm(); // Проверка формы
    }
 
 }
 
-// Проверка заполнения всех полей формы
-modalSubmit.addEventListener('input', () => {
+// Проверка формы на валидацию
+const checkForm = () => {
    const validForm = elementsModalSubmit.every(elem => elem.value); // Выбирает все значения формы
    modalBtnSubmit.disabled = !validForm; // Блокирует кнопку если форма не заполнена и разблокирует если заполнена
    modalBtnWarning.style.display = validForm ? 'none' : ''; // Если форма заполнена предупреждение скрывается
+}
+
+// Отображение всех товаров из БД на странице
+const renderCard = () => {
+   catalog.textContent = ''; // Очищаем весь блок
+   // Выгружаем все товары
+   dataBase.forEach((item, i) => {
+      // Отображаем каждый товар на странице
+      catalog.insertAdjacentHTML('beforeend', `
+         <li class="card" data-id="${i}">
+            <img class="card__image" src="data:image/jpeg;base64,${item.image}" alt="${item.nameItem}">
+            <div class="card__description">
+               <h3 class="card__header">${item.nameItem}</h3>
+               <div class="card__price">${item.costItem}</div>
+            </div>
+         </li>
+      `);
+   });
+};
+
+// Выгружаем данные определенного товара при клике по нему
+const showItem = target => {
+   // В завимимости от того, на что нажал пользователь (заголовок, цена, описание) - все сводится к родителю "card"
+   const card = target.parentNode.classList.contains('card') ? target.parentNode : target.parentNode.parentNode;
+   const cardItem = dataBase.find((item, i) => i == card.getAttribute('data-id')); // Находим нужный элемент по ID
+   // Отображаем информацию в модальном окне
+   modalItem.insertAdjacentHTML('beforeend', `
+      <div class="modal__block">
+         <h2 class="modal__header">Купить</h2>
+         <div class="modal__content">
+            <div><img class="modal__image modal__image-item" src="data:image/jpeg;base64, ${cardItem.image}" alt="test"></div>
+            <div class="modal__description">
+               <h3 class="modal__header-item">${cardItem.nameItem}</h3>
+               <p><strong>Состояние</strong>: <span class="modal__status-item">${cardItem.status}</span></p>
+               <p><strong>Описание</strong>:
+                  <span class="modal__description-item">${cardItem.descriptionItem}</span>
+               </p>
+               <p><strong>Цена</strong>: <span class="modal__cost-item">${cardItem.costItem} ₽</span></p>
+               <button class="btn">Купить</button>
+            </div>
+         </div>
+         <button class="modal__close">&#10008;</button>
+      </div>
+   `);
+}
+
+// Событие изменения фотки
+modalFileInput.addEventListener('change', event => {
+
+   const target = event.target; // На что кликнули
+
+   const reader = new FileReader(); // Считыватель файла
+
+   const file = target.files[0]; // Находит все загруженные файлы
+
+   infoPhoto.filename = file.name; // Имя файла
+   infoPhoto.size = file.size; // Размер файла
+
+   reader.readAsBinaryString(file); // Преобразуем в двоичную строку
+
+   // Зарузка фото
+   reader.addEventListener('load', event => {
+      // Размер меньше 200 кб
+      if (infoPhoto.size < 200000) {
+         modalFileBtn.textContent = infoPhoto.filename; // Имя файла отоббражается в кнопке загрузки
+         infoPhoto.base64 = btoa(event.target.result); // Кодируем строку
+         modalImageAdd.src = `data:image/jpeg;base64, ${infoPhoto.base64}`; // Присваиваем строку к пути до файла
+      }
+      // Файл больше 200 кб
+      else {
+         modalFileBtn.textContent = 'Файл не должен превышать 200кб'; // Отображается в кнопке загрузки
+         modalFileInput.value = ''; // Обнуляется значение
+         checkForm(); // Проверяется форма
+      }
+   });
+
 })
+
+// Проверка заполнения всех полей формы
+modalSubmit.addEventListener('input', checkForm);
 
 // Проверка отправки формы
 modalSubmit.addEventListener('submit', event => {
@@ -51,8 +137,11 @@ modalSubmit.addEventListener('submit', event => {
    for (const elem of elementsModalSubmit) {
       itemObj[elem.name] = elem.value;
    }
+   itemObj.image = infoPhoto.base64;
    dataBase.push(itemObj); // добавление объекта в БД
-   modalAdd.classList.add('hide'); // Закрываем окно
+   closeModal({target: modalAdd}); // Закрываем окно
+   saveDB(); // Сохранение БД
+   renderCard(); // Отображение
 })
 
 // Открытие окна добавления объявления
@@ -69,6 +158,7 @@ catalog.addEventListener('click', event => {
 
    // Если нажали именно в пределах карточки товара
    if (target.closest(".card") || target !== catalog) {
+      showItem(target);
       modalItem.classList.remove('hide'); // Показывает модальное окно товара
       document.body.addEventListener('keydown', closeModal); // Добавляем слушателя при нажатии на кнопку
    }
@@ -78,3 +168,4 @@ catalog.addEventListener('click', event => {
 // События закрытие окон
 modalItem.addEventListener('click', closeModal);
 modalAdd.addEventListener('click', closeModal);
+renderCard();
