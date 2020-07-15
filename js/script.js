@@ -1,7 +1,7 @@
 'use strict';
 
 const dataBase = JSON.parse(localStorage.getItem('awito')) || []; // Все данные
-
+let counter = dataBase.length; // Счетчик
 const modalAdd = document.querySelector('.modal__add'), // Окно добавления объявления
       addAd = document.querySelector('.add__ad'), // Кнопка добавления объявления
       modalBtnSubmit = document.querySelector('.modal__btn-submit'), // Кнопка отправки формы добавления объявления
@@ -15,6 +15,9 @@ const modalAdd = document.querySelector('.modal__add'), // Окно добавл
 
 const textFileBtn = modalFileBtn.textContent; // Текст кнопки добавления фотки
 const srcModalImage = modalImageAdd.src; // Путь до изначальной картинки
+
+const searchInput = document.querySelector('.search__input'), // Поле поиска
+      menuContainer = document.querySelector('.menu__container'); // Меню навигации 
 
 // Выбирает из формы только input'ы
 const elementsModalSubmit = [...modalSubmit.elements].filter(elem => elem.tagName !== 'BUTTON' && elem.type !== 'submit');
@@ -51,13 +54,13 @@ const checkForm = () => {
 }
 
 // Отображение всех товаров из БД на странице
-const renderCard = () => {
+const renderCard = (DB = dataBase) => {
    catalog.textContent = ''; // Очищаем весь блок
    // Выгружаем все товары
-   dataBase.forEach((item, i) => {
+   DB.forEach(item => {
       // Отображаем каждый товар на странице
       catalog.insertAdjacentHTML('beforeend', `
-         <li class="card" data-id="${i}">
+         <li class="card" data-id="${item.id}">
             <img class="card__image" src="data:image/jpeg;base64,${item.image}" alt="${item.nameItem}">
             <div class="card__description">
                <h3 class="card__header">${item.nameItem}</h3>
@@ -72,7 +75,7 @@ const renderCard = () => {
 const showItem = target => {
    // В завимимости от того, на что нажал пользователь (заголовок, цена, описание) - все сводится к родителю "card"
    const card = target.parentNode.classList.contains('card') ? target.parentNode : target.parentNode.parentNode;
-   const cardItem = dataBase.find((item, i) => i == card.getAttribute('data-id')); // Находим нужный элемент по ID
+   const cardItem = dataBase.find(item => item.id === +card.dataset.id); // Находим нужный элемент по ID
    // Отображаем информацию в модальном окне
    modalItem.insertAdjacentHTML('beforeend', `
       <div class="modal__block">
@@ -93,6 +96,26 @@ const showItem = target => {
       </div>
    `);
 }
+
+// Введение чего то в поле поиска
+searchInput.addEventListener('input', event => {
+   
+   const valueSearch = searchInput.value.trim().toLowerCase();
+
+   // Выдает все результаты поиска в БД
+   if (valueSearch.length > 2){
+      
+      const result = dataBase.filter(item => item.nameItem.toLowerCase().includes(valueSearch) || item.descriptionItem.toLowerCase().includes(valueSearch));
+      renderCard(result);
+
+   }
+
+   // Выводит все товары
+   else {
+      renderCard()
+   }
+
+});
 
 // Событие изменения фотки
 modalFileInput.addEventListener('change', event => {
@@ -136,6 +159,7 @@ modalSubmit.addEventListener('submit', event => {
    // Перебирает все значения из формы и заносит их в объект
    for (const elem of elementsModalSubmit) {
       itemObj[elem.name] = elem.value;
+      itemObj.id = counter++;
    }
    itemObj.image = infoPhoto.base64;
    dataBase.push(itemObj); // добавление объекта в БД
@@ -163,6 +187,15 @@ catalog.addEventListener('click', event => {
       document.body.addEventListener('keydown', closeModal); // Добавляем слушателя при нажатии на кнопку
    }
 
+})
+
+// Нажатие по ссылкам на странице
+menuContainer.addEventListener('click', event => {
+   const target = event.target;
+   if (target.tagName === 'A'){
+      const result = dataBase.filter(item => item.category === target.dataset.category);
+      renderCard(result);
+   }
 })
 
 // События закрытие окон
